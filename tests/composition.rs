@@ -37,7 +37,7 @@ impl Matcher for LineCommentRule {
 
             match bytes.get(len) {
                 Some(b'\n' | b'\r') | None => {
-                    return Ok(Some(Match::new(JsoncToken::Comment, len)));
+                    return Ok(Match::from_len(JsoncToken::Comment, len));
                 }
                 Some(_) => len = len.saturating_add(1),
             }
@@ -141,5 +141,5 @@ fn json_shapes_stay_strict_inside_the_superset() {
     let Err(error) = lex_kinds("01") else {
         panic!("expected the reused number rule to keep rejecting leading zeros");
     };
-    assert_eq!(error.position.byte, 1);
+    assert_eq!(error.position.byte(), 1);
 }

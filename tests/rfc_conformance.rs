@@ -24,7 +24,7 @@ fn assert_lex_err(input: &str, kind: &LexErrorKind, byte: u64) {
         std::mem::discriminant(kind),
         "input {input:?}, got {lex:?}"
     );
-    assert_eq!(error.position.byte, byte, "input {input:?}");
+    assert_eq!(error.position.byte(), byte, "input {input:?}");
 }
 
 /// The raw source text of the root scalar token.
@@ -124,8 +124,8 @@ fn string_span_covers_both_quotes() -> Result<(), JsonError> {
     let Value::String(token) = document.root() else {
         panic!("expected a string root");
     };
-    assert_eq!(token.span.start, 2);
-    assert_eq!(token.span.end, 6);
+    assert_eq!(token.span.start(), 2);
+    assert_eq!(token.span.end(), 6);
     Ok(())
 }
 
@@ -311,7 +311,7 @@ fn invalid_utf8_in_a_string_is_rejected() {
         &error.kind,
         JsonErrorKind::Lex(lex) if matches!(lex.kind, LexErrorKind::Unrecognized)
     ));
-    assert_eq!(error.position.byte, 2);
+    assert_eq!(error.position.byte(), 2);
 }
 
 #[test]
@@ -346,7 +346,7 @@ fn trailing_comma_in_object_is_rejected() {
         ),
         "got {error:?}"
     );
-    assert_eq!(error.position.byte, 7);
+    assert_eq!(error.position.byte(), 7);
 }
 
 #[test]
@@ -362,7 +362,7 @@ fn trailing_comma_in_array_is_rejected() {
         ),
         "got {error:?}"
     );
-    assert_eq!(error.position.byte, 3);
+    assert_eq!(error.position.byte(), 3);
 }
 
 #[test]
@@ -494,11 +494,11 @@ fn stray_closers_are_rejected() {
 fn empty_and_whitespace_only_inputs_are_rejected() {
     let error = parse_err("");
     assert!(matches!(error.kind, JsonErrorKind::UnexpectedEof { .. }));
-    assert_eq!(error.position.byte, 0);
+    assert_eq!(error.position.byte(), 0);
 
     let error = parse_err("  \r\n ");
     assert!(matches!(error.kind, JsonErrorKind::UnexpectedEof { .. }));
-    assert_eq!(error.position.byte, 5);
+    assert_eq!(error.position.byte(), 5);
 }
 
 #[test]
@@ -510,7 +510,7 @@ fn trailing_content_is_rejected() {
             found: JsonToken::Null,
         }
     ));
-    assert_eq!(error.position.byte, 5);
+    assert_eq!(error.position.byte(), 5);
 
     assert!(matches!(
         parse_err("1 2").kind,
@@ -534,7 +534,7 @@ fn error_positions_report_line_and_column() {
     };
     assert!(matches!(lex.kind, LexErrorKind::Unrecognized));
     // The second digit of `01` sits on line 2, and its precise byte is reported.
-    assert_eq!(error.position.byte, 10);
-    assert_eq!(error.position.line, 2);
-    assert_eq!(error.position.column, 9);
+    assert_eq!(error.position.byte(), 10);
+    assert_eq!(error.position.line(), 2);
+    assert_eq!(error.position.column(), 9);
 }

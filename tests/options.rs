@@ -31,7 +31,7 @@ fn strict_parser_rejects_a_leading_bom() {
         panic!("expected the BOM to be rejected");
     };
     assert!(matches!(error.kind, JsonErrorKind::UnexpectedBom));
-    assert_eq!(error.position.byte, 0);
+    assert_eq!(error.position.byte(), 0);
 }
 
 #[test]
@@ -43,11 +43,11 @@ fn allow_bom_tolerates_a_leading_bom_as_trivia() -> Result<(), JsonError> {
         panic!("expected the BOM to be retained");
     };
     assert_eq!(bom.kind, TriviaKind::Bom);
-    assert_eq!(bom.span.start, 0);
-    assert_eq!(bom.span.end, 3);
+    assert_eq!(bom.span.start(), 0);
+    assert_eq!(bom.span.end(), 3);
 
     // The value tokens sit after the BOM.
-    assert_eq!(document.root().first_token().span.start, 3);
+    assert_eq!(document.root().first_token().span.start(), 3);
 
     Ok(())
 }
@@ -92,7 +92,7 @@ fn bom_after_the_first_byte_is_always_an_error() {
             panic!("expected a lexical error, got {error:?}");
         };
         assert!(matches!(lex.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 2);
+        assert_eq!(error.position.byte(), 2);
     }
 }
 
@@ -126,7 +126,7 @@ fn default_depth_limit_is_documented_and_enforced() {
     ));
     // The error points at the first open bracket beyond the limit.
     assert_eq!(
-        error.position.byte,
+        error.position.byte(),
         u64::try_from(DEFAULT_MAX_DEPTH).unwrap_or(u64::MAX)
     );
 }

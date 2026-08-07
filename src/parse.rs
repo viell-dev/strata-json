@@ -104,7 +104,9 @@ impl fmt::Display for JsonError {
             kind => write!(
                 formatter,
                 "{kind} at line {}, column {} (byte {})",
-                self.position.line, self.position.column, self.position.byte
+                self.position.line(),
+                self.position.column(),
+                self.position.byte()
             ),
         }
     }
@@ -353,7 +355,7 @@ impl<R: Read, M: MatcherSet<Kind = JsonToken>> Driver<R, M> {
                         self.push_trivia(TriviaKind::Bom, &token);
                     } else {
                         return Err(JsonError {
-                            position: token.start,
+                            position: token.start(),
                             kind: JsonErrorKind::UnexpectedBom,
                         });
                     }
@@ -361,9 +363,9 @@ impl<R: Read, M: MatcherSet<Kind = JsonToken>> Driver<R, M> {
                 _ => {
                     return Ok(SyntaxToken {
                         kind: token.kind,
-                        span: token.span,
-                        start: token.start,
-                        end: token.end,
+                        span: token.span(),
+                        start: token.start(),
+                        end: token.end(),
                         leading: std::mem::take(&mut self.pending),
                     });
                 }
@@ -386,9 +388,9 @@ impl<R: Read, M: MatcherSet<Kind = JsonToken>> Driver<R, M> {
     fn push_trivia(&mut self, kind: TriviaKind, token: &Token<JsonToken>) {
         self.pending.push(Trivia {
             kind,
-            span: token.span,
-            start: token.start,
-            end: token.end,
+            span: token.span(),
+            start: token.start(),
+            end: token.end(),
         });
     }
 

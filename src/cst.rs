@@ -38,7 +38,7 @@ pub struct Trivia {
 impl Trivia {
     /// The number of line breaks inside this trivia piece.
     pub const fn line_breaks(&self) -> u64 {
-        self.end.line.saturating_sub(self.start.line)
+        self.end.line().saturating_sub(self.start.line())
     }
 
     /// The number of blank lines inside this trivia piece.
@@ -121,7 +121,10 @@ impl Value {
     /// The absolute byte range this value covers, from its first to its last lexeme byte
     /// (leading trivia excluded).
     pub const fn span(&self) -> Span {
-        Span::new(self.first_token().span.start, self.last_token().span.end)
+        let start = self.first_token().span.start();
+        let end = self.last_token().span.end();
+
+        Span::from_start_len(start, end.saturating_sub(start))
     }
 
     /// Visits every significant token of this value in source order.
@@ -287,14 +290,18 @@ impl Document {
 mod tests {
     use super::*;
 
-    const fn position(byte: u64, line: u64, column: u64) -> Position {
-        Position { byte, line, column }
+    fn position(byte: u64, line: u64, column: u64) -> Position {
+        let Ok(position) = Position::new(byte, line, column) else {
+            panic!("test positions must be one-based");
+        };
+
+        position
     }
 
     fn trivia(start: Position, end: Position) -> Trivia {
         Trivia {
             kind: TriviaKind::Whitespace,
-            span: Span::new(start.byte, end.byte),
+            span: Span::from_start_len(start.byte(), end.byte().saturating_sub(start.byte())),
             start,
             end,
         }
@@ -325,7 +332,7 @@ mod tests {
     fn value_first_and_last_token_cover_containers() {
         let token = |kind: JsonToken, start: u64, end: u64| SyntaxToken {
             kind,
-            span: Span::new(start, end),
+            span: Span::from_start_len(start, end.saturating_sub(start)),
             start: position(start, 1, start.saturating_add(1)),
             end: position(end, 1, end.saturating_add(1)),
             leading: Vec::new(),
@@ -341,7 +348,7 @@ mod tests {
 
         assert_eq!(array.first_token().kind, JsonToken::LeftBracket);
         assert_eq!(array.last_token().kind, JsonToken::RightBracket);
-        assert_eq!(array.span(), Span::new(0, 3));
+        assert_eq!(array.span(), Span::from_start_len(0, 3));
 
         let mut kinds = Vec::new();
         array.for_each_token(&mut |token| kinds.push(token.kind));

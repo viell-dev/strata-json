@@ -13,6 +13,7 @@
 //! failures reported at the offending byte. Escape decoding and numeric conversion stay
 //! downstream, at the resolver boundary.
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use strata_lexer::{
     Candidate, LexError, Lookahead, Match, Matcher, MatcherSet, Position, SpecScanner,
@@ -180,13 +181,7 @@ fn run_len(
 /// verified that the bytes before `offset` contain no line breaks (numbers are ASCII digits and
 /// signs; string errors are reported before any unescaped control byte could pass).
 fn offset_position(start: Position, offset: usize) -> Position {
-    let offset = u64::try_from(offset).unwrap_or(u64::MAX);
-
-    Position {
-        byte: start.byte.saturating_add(offset),
-        line: start.line,
-        column: start.column.saturating_add(offset),
-    }
+    start.advanced_by(u64::try_from(offset).unwrap_or(u64::MAX))
 }
 
 /// Matches a run of insignificant whitespace (RFC 8259 §2): space, tab, CR, LF — exactly those
@@ -200,7 +195,7 @@ impl Matcher for WhitespaceRule {
     fn try_match(&self, look: &mut Lookahead<'_>) -> Result<Option<Match<JsonToken>>, LexError> {
         let len = run_len(look, 0, |byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))?;
 
-        Ok((len > 0).then(|| Match::new(JsonToken::Whitespace, len)))
+        Ok(Match::from_len(JsonToken::Whitespace, len))
     }
 }
 
@@ -222,7 +217,7 @@ impl Matcher for PunctRule {
             _ => return Ok(None),
         };
 
-        Ok(Some(Match::new(kind, 1)))
+        Ok(Some(Match::new(kind, NonZeroUsize::MIN)))
     }
 }
 
@@ -243,7 +238,7 @@ impl Matcher for LiteralRule {
         };
 
         if look.peek(word.len())? == word {
-            Ok(Some(Match::new(kind, word.len())))
+            Ok(Match::from_len(kind, word.len()))
         } else {
             Ok(None)
         }
@@ -338,7 +333,7 @@ fn finish_string(
     let raw = look.peek(len)?;
 
     match core::str::from_utf8(raw) {
-        Ok(_) => Ok(Some(Match::new(JsonToken::String, len))),
+        Ok(_) => Ok(Match::from_len(JsonToken::String, len)),
         Err(error) => Err(LexError::unrecognized(offset_position(
             start,
             error.valid_up_to(),
@@ -433,7 +428,7 @@ impl Matcher for NumberRule {
             index = exp_end;
         }
 
-        Ok(Some(Match::new(JsonToken::Number, index)))
+        Ok(Match::from_len(JsonToken::Number, index))
     }
 }
 
@@ -450,11 +445,15 @@ impl Matcher for BomRule {
     type Kind = JsonToken;
 
     fn try_match(&self, look: &mut Lookahead<'_>) -> Result<Option<Match<JsonToken>>, LexError> {
-        if look.position().byte != 0 {
+        if look.position().byte() != 0 {
             return Ok(None);
         }
 
-        Ok((look.peek(3)? == BOM_BYTES.as_slice()).then(|| Match::new(JsonToken::Bom, 3)))
+        if look.peek(3)? == BOM_BYTES.as_slice() {
+            Ok(Match::from_len(JsonToken::Bom, BOM_BYTES.len()))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -471,7 +470,7 @@ mod tests {
         loop {
             let token = lexer.next_token()?;
             let done = token.kind == JsonToken::Eof;
-            out.push((token.kind, token.span.start, token.span.end));
+            out.push((token.kind, token.span().start(), token.span().end()));
 
             if done {
                 break;
@@ -531,7 +530,7 @@ mod tests {
     fn uppercase_literals_are_unrecognized() {
         let error = lex_error("TRUE");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 0);
+        assert_eq!(error.position.byte(), 0);
     }
 
     #[test]
@@ -555,7 +554,7 @@ mod tests {
         // Vertical tab (0x0B) is not RFC 8259 whitespace.
         let error = lex_error("\u{0B}null");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 0);
+        assert_eq!(error.position.byte(), 0);
     }
 
     #[test]
@@ -582,11 +581,11 @@ mod tests {
     fn leading_zero_is_rejected_at_second_digit() {
         let error = lex_error("01");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 1);
+        assert_eq!(error.position.byte(), 1);
 
         let error = lex_error("-01");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 2);
+        assert_eq!(error.position.byte(), 2);
     }
 
     #[test]
@@ -608,7 +607,7 @@ mod tests {
                 matches!(error.kind, LexErrorKind::Unrecognized),
                 "input {input:?}"
             );
-            assert_eq!(error.position.byte, 0, "input {input:?}");
+            assert_eq!(error.position.byte(), 0, "input {input:?}");
         }
     }
 
@@ -656,7 +655,7 @@ mod tests {
         // Bytes: 0 `"`, 1 `\`, 2 `q`.
         let error = lex_error(r#""\q""#);
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 1);
+        assert_eq!(error.position.byte(), 1);
     }
 
     #[test]
@@ -670,7 +669,7 @@ mod tests {
     fn short_unicode_escape_is_rejected() {
         let error = lex_error(r#""\u123""#);
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 1);
+        assert_eq!(error.position.byte(), 1);
     }
 
     #[test]
@@ -684,18 +683,18 @@ mod tests {
         // Bytes: 0 `"`, 1 tab.
         let error = lex_error("\"\t\"");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 1);
+        assert_eq!(error.position.byte(), 1);
 
         let error = lex_error("\"a\nb\"");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 2);
+        assert_eq!(error.position.byte(), 2);
     }
 
     #[test]
     fn unterminated_string_is_rejected_at_opening_quote() {
         let error = lex_error(r#""open"#);
         assert!(matches!(error.kind, LexErrorKind::UnterminatedDelimiter));
-        assert_eq!(error.position.byte, 0);
+        assert_eq!(error.position.byte(), 0);
     }
 
     #[test]
@@ -706,7 +705,7 @@ mod tests {
             panic!("expected a lexical error");
         };
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 2);
+        assert_eq!(error.position.byte(), 2);
     }
 
     #[test]
@@ -723,7 +722,7 @@ mod tests {
         // The same bytes later in the input are not a BOM token.
         let error = lex_error("1 \u{FEFF}");
         assert!(matches!(error.kind, LexErrorKind::Unrecognized));
-        assert_eq!(error.position.byte, 2);
+        assert_eq!(error.position.byte(), 2);
 
         Ok(())
     }

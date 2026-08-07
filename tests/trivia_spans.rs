@@ -47,13 +47,13 @@ fn leading_and_trailing_whitespace_is_retained() -> Result<(), JsonError> {
         panic!("expected one leading trivia piece, got {leading:?}");
     };
     assert_eq!(trivia.kind, TriviaKind::Whitespace);
-    assert_eq!(trivia.span, Span::new(0, 2));
+    assert_eq!(trivia.span, Span::from_start_len(0, 2));
 
     let [trailing] = document.trailing_trivia() else {
         panic!("expected one trailing trivia piece");
     };
     assert_eq!(trailing.kind, TriviaKind::Whitespace);
-    assert_eq!(trailing.span, Span::new(6, 8));
+    assert_eq!(trailing.span, Span::from_start_len(6, 2));
 
     Ok(())
 }
@@ -127,9 +127,9 @@ fn spans_are_contiguous_and_cover_the_input() -> Result<(), JsonError> {
     let mut cursor: u64 = 0;
 
     for span in all_spans(&document) {
-        assert_eq!(span.start, cursor, "gap or overlap before {span:?}");
-        assert!(span.end >= span.start);
-        cursor = span.end;
+        assert_eq!(span.start(), cursor, "gap or overlap before {span:?}");
+        assert!(span.end() >= span.start());
+        cursor = span.end();
     }
 
     assert_eq!(cursor, u64::try_from(input.len()).unwrap_or(u64::MAX));
@@ -176,20 +176,23 @@ fn positions_track_lines_and_columns() -> Result<(), JsonError> {
         panic!("expected an array");
     };
 
-    assert_eq!(array.open.start.line, 1);
-    assert_eq!(array.open.start.column, 1);
+    assert_eq!(array.open.start.line(), 1);
+    assert_eq!(array.open.start.column(), 1);
 
     let [one, twentytwo] = array.elements.as_slice() else {
         panic!("expected two elements");
     };
     let one = one.value.first_token();
-    assert_eq!((one.start.line, one.start.column), (2, 3));
+    assert_eq!((one.start.line(), one.start.column()), (2, 3));
 
     let twentytwo = twentytwo.value.first_token();
-    assert_eq!((twentytwo.start.line, twentytwo.start.column), (3, 3));
-    assert_eq!((twentytwo.end.line, twentytwo.end.column), (3, 5));
+    assert_eq!((twentytwo.start.line(), twentytwo.start.column()), (3, 3));
+    assert_eq!((twentytwo.end.line(), twentytwo.end.column()), (3, 5));
 
-    assert_eq!((array.close.start.line, array.close.start.column), (4, 1));
+    assert_eq!(
+        (array.close.start.line(), array.close.start.column()),
+        (4, 1)
+    );
 
     Ok(())
 }
