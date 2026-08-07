@@ -6,6 +6,26 @@ Strict RFC 8259 JSON parser for the Strata parser ecosystem.
 
 This crate is in initial development. The public API is not settled yet.
 
+## Usage
+
+```rust
+use strata_json::{JsonParser, Value};
+
+let document = JsonParser::new().parse_str(r#"{ "name": "strata" }"#)?;
+
+let Value::Object(object) = document.root() else {
+    unreachable!()
+};
+let member = object.members.first().unwrap();
+
+// Zero-copy access to the raw source bytes, quotes included, no decoding.
+assert_eq!(document.token_bytes(&member.name), Some(&b"\"name\""[..]));
+```
+
+`JsonParser::new()` is fully strict RFC 8259. The builder exposes the spec-permitted options
+(`allow_bom` per §8.1, `max_depth` per §9) and hooks to replace the token rules or lexer
+configuration. See [`docs/strata-json.md`](docs/strata-json.md) for the full design reference.
+
 ## Minimum Supported Rust Version
 
 The MSRV is **1.87.0**.
