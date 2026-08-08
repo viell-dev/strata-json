@@ -8,6 +8,47 @@ bytes, member order, duplicate members, and trivia), built on `strata-json-parse
 
 This crate is in initial development. The public API is not settled yet.
 
+## Usage
+
+```rust
+use strata_json::{JsonError, JsonNumber, JsonResolver};
+
+fn main() -> Result<(), JsonError> {
+    let document = JsonResolver::new().resolve_str(
+        "{\n  \"name\": \"caf\\u00e9\",\n\n  \"count\": 3\n}",
+    )?;
+
+    let Some(object) = document.root().as_object() else {
+        panic!("expected an object root");
+    };
+
+    // Owned, decoded values...
+    assert_eq!(object.get("name").and_then(|v| v.as_str()), Some("café"));
+    assert_eq!(
+        object.get("count").and_then(|v| v.as_number()),
+        Some(JsonNumber::U64(3))
+    );
+
+    // ...with source fidelity still attached: spans, raw bytes, blank lines.
+    let [count] = &object.get_all("count").collect::<Vec<_>>()[..] else {
+        panic!("expected one \"count\" member");
+    };
+    assert_eq!(
+        document.bytes(count.name_meta().span()),
+        Some(&b"\"count\""[..])
+    );
+    let [gap] = count.name_meta().leading() else {
+        panic!("expected the whitespace before \"count\"");
+    };
+    assert_eq!(gap.blank_lines(), 1);
+
+    Ok(())
+}
+```
+
+See [docs/strata-json.md](docs/strata-json.md) for the design reference, including the
+duplicate-member and lone-surrogate policies.
+
 ## Minimum Supported Rust Version
 
 The MSRV is **1.87.0**.

@@ -26,3 +26,8 @@ pub use resolve::{DuplicateKeys, JsonResolver, JsonResolverBuilder};
 pub use strata_json_parser::decode::LoneSurrogates;
 pub use strata_json_parser::{Trivia, TriviaKind};
 pub use value::{JsonArray, JsonMember, JsonNumber, JsonObject, JsonValue, Meta};
+
+/// Compile-checks the README examples alongside the doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme {}
