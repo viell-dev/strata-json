@@ -21,7 +21,7 @@ strata-json-rules -> strata-json-parser -> strata-json (this crate)
 | Module     | Public items |
 |------------|--------------|
 | `resolve`  | `JsonResolver<M>`, `JsonResolverBuilder<M>`, `DuplicateKeys` |
-| `value`    | `JsonValue`, `JsonArray`, `JsonObject`, `JsonMember`, `JsonNumber`, `Meta` |
+| `value`    | `JsonValue`, `JsonArray`, `JsonObject`, `JsonMember`, `JsonNumber`, `NumberFormat`, `Meta` |
 | `document` | `JsonDocument` |
 | `error`    | `JsonError`, `JsonErrorKind` |
 
@@ -46,11 +46,13 @@ CST (whose retained source must still back the tree — a reclaimed store yields
 
 ## 3. The model (`value`, `document`)
 
-- `JsonValue` — `Null(Meta)`, `Bool(bool, Meta)`, `Number(JsonNumber, Meta)`,
+- `JsonValue` — `Null(Meta)`, `Bool(bool, Meta)`, `Number(JsonNumber, NumberFormat, Meta)`,
   `String(String, Meta)`, `Array(JsonArray)`, `Object(JsonObject)`, with `meta()`, `span()`, and
   `as_*`/`is_*` accessors. `JsonNumber` is the parser `decode::Number` re-exported: `U64` for
   non-negative integers that fit, `I64` for negative, `F64` otherwise (`-0` keeps its sign;
-  oversized integers round with the raw text still reachable for arbitrary precision).
+  oversized integers round with the raw text still reachable for arbitrary precision). The
+  written form rides along as a `NumberFormat` (`Integer`, `Decimal`, `Exponential`) exposed by
+  `JsonValue::number_format()` — author-intent fidelity without re-reading raw bytes.
 - `Meta` — per-node fidelity: lexeme span (containers cover open through close), start/end
   positions, and the leading trivia (whitespace runs with `line_breaks()`/`blank_lines()`, a
   tolerated BOM). Metas are only created by resolution, so they always describe genuine nodes.
