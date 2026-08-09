@@ -1,6 +1,8 @@
 //! Owned-value resolution: scalars, string decoding, and number conversion.
 
-use strata_json::{JsonError, JsonErrorKind, JsonNumber, JsonResolver, JsonValue, LoneSurrogates};
+use strata_json::{
+    JsonError, JsonErrorKind, JsonNumber, JsonResolver, JsonValue, LoneSurrogates, NumberFormat,
+};
 
 fn root(input: &str) -> Result<JsonValue, JsonError> {
     Ok(JsonResolver::new().resolve_str(input)?.into_parts().0)
@@ -97,6 +99,19 @@ fn fractions_exponents_and_overflow_convert_to_f64() -> Result<(), JsonError> {
         root("18446744073709551616")?.as_f64(),
         Some(18_446_744_073_709_551_616.0)
     );
+
+    Ok(())
+}
+
+#[test]
+fn number_formats_surface_the_written_form() -> Result<(), JsonError> {
+    assert_eq!(root("42")?.number_format(), Some(NumberFormat::Integer));
+    assert_eq!(root("-0.5")?.number_format(), Some(NumberFormat::Decimal));
+    assert_eq!(
+        root("1.23e+5")?.number_format(),
+        Some(NumberFormat::Exponential)
+    );
+    assert_eq!(root("true")?.number_format(), None);
 
     Ok(())
 }

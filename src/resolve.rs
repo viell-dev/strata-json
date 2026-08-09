@@ -225,7 +225,11 @@ impl Resolution<'_> {
                 let number =
                     decode::parse_number(&raw).map_err(|error| Self::decode_error(token, error))?;
 
-                Ok(JsonValue::Number(number, token_meta(token)))
+                Ok(JsonValue::Number(
+                    number.value,
+                    number.format,
+                    token_meta(token),
+                ))
             }
             Value::String(token) => {
                 let text = self.decode_string(token)?;
